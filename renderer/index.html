@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Desktop Clock</title>
+    <link rel="stylesheet" href="vendor/flipclock.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="clock"></div>
+    </div>
+
+    <script src="vendor/FlipClock.umd.js"></script>
+    <script>
+      const { flipClock, clock, theme, css } = FlipClock;
+
+      flipClock({
+        parent: document.querySelector('#clock'),
+        face: clock(),
+        theme: theme({
+          dividers: ':',
+          css: css({
+            fontSize: '3rem',
+          }),
+        }),
+      });
+    </script>
+  </body>
+</html>
