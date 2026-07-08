@@ -1,6 +1,6 @@
 {
   "name": "desktop-clock",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Desktop flip clock powered by FlipClock.js",
   "main": "electron/main.js",
   "author": "",
