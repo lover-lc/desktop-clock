@@ -24,4 +24,9 @@ contextBridge.exposeInMainWorld('desktopClock', {
     });
   },
   fitWindow: () => ipcRenderer.invoke('fit-window'),
+  startWindowDrag: () => ipcRenderer.send('window-drag-start'),
+  dragWindow: (screenX, screenY) => {
+    ipcRenderer.send('window-drag-move', { screenX, screenY });
+  },
+  endWindowDrag: () => ipcRenderer.send('window-drag-end'),
 });

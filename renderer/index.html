@@ -28,7 +28,7 @@
         justify-content: center;
         gap: 8px;
         padding: 8px;
-        -webkit-app-region: drag;
+        cursor: default;
       }
 
       #date {
@@ -38,7 +38,6 @@
         color: rgba(255, 255, 255, 0.88);
         letter-spacing: 0.04em;
         text-align: center;
-        -webkit-app-region: drag;
       }
 
       #countdown {
@@ -54,68 +53,75 @@
       }
 
       #toast {
-        position: fixed;
-        left: 50%;
-        bottom: 8px;
-        transform: translateX(-50%) translateY(12px);
-        max-width: calc(100vw - 32px);
-        padding: 10px 16px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        width: max-content;
+        max-width: 420px;
+        margin-top: 4px;
+        padding: 10px 12px;
         border-radius: 8px;
         font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
         font-size: 0.875rem;
         line-height: 1.4;
         color: #fff;
-        background: rgba(30, 30, 30, 0.92);
+        background: rgba(30, 30, 30, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        -webkit-app-region: no-drag;
-        z-index: 100;
+        box-shadow: none;
         white-space: nowrap;
       }
 
       #toast.visible {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-        pointer-events: auto;
+        display: inline-flex;
       }
 
-      #toast.persistent {
-        padding-right: 36px;
+      #toast-message {
+        flex: 1;
+        min-width: 0;
       }
 
       #toast-close {
-        position: absolute;
-        top: 6px;
-        right: 8px;
-        width: 20px;
-        height: 20px;
-        border: none;
-        border-radius: 4px;
-        background: transparent;
-        color: rgba(255, 255, 255, 0.8);
+        flex-shrink: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.92);
         cursor: pointer;
-        font-size: 14px;
+        font-size: 18px;
+        font-weight: 600;
         line-height: 1;
-        -webkit-app-region: no-drag;
+      }
+
+      #toast.persistent #toast-close {
+        display: inline-flex;
       }
 
       #toast-close:hover {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.18);
+        border-color: rgba(255, 255, 255, 0.35);
       }
 
       #toast[data-type='success'] {
-        border-color: rgba(72, 187, 120, 0.6);
+        border-color: rgba(72, 187, 120, 0.55);
       }
 
       #toast[data-type='error'] {
-        border-color: rgba(245, 101, 101, 0.6);
+        border-color: rgba(245, 101, 101, 0.55);
       }
 
       #toast[data-type='info'] {
-        border-color: rgba(99, 179, 237, 0.6);
+        border-color: rgba(99, 179, 237, 0.55);
+      }
+
+      #toast[data-type='countdown-end'] {
+        background: rgba(30, 30, 30, 0.95);
+        border: 1px solid rgba(230, 126, 34, 0.75);
+        box-shadow: none;
       }
     </style>
   </head>
@@ -124,10 +130,10 @@
       <div id="clock"></div>
       <div id="date"></div>
       <div id="countdown"><div id="countdown-clock"></div></div>
-    </div>
-    <div id="toast" aria-live="polite">
-      <span id="toast-message"></span>
-      <button id="toast-close" hidden aria-label="关闭">×</button>
+      <div id="toast" aria-live="polite">
+        <span id="toast-message"></span>
+        <button id="toast-close" type="button" aria-label="关闭">×</button>
+      </div>
     </div>
 
     <script src="vendor/FlipClock.umd.js"></script>
@@ -146,6 +152,7 @@
 
       let toastTimer = null;
       let countdownInstance = null;
+      let dragging = false;
 
       function getTimeFormat(use24Hour) {
         return use24Hour ? '[HH]:[mm]:[ss]' : '[hh]:[mm]:[ss][A]';
@@ -166,6 +173,28 @@
       function scheduleFitWindow() {
         requestAnimationFrame(() => {
           window.desktopClock.fitWindow().catch(() => {});
+        });
+      }
+
+      function setupWindowDrag() {
+        const appEl = document.getElementById('app');
+
+        appEl.addEventListener('mousedown', (event) => {
+          if (event.button !== 0) return;
+          if (event.target.closest('#toast-close')) return;
+          dragging = true;
+          window.desktopClock.startWindowDrag();
+        });
+
+        window.addEventListener('mousemove', (event) => {
+          if (!dragging) return;
+          window.desktopClock.dragWindow(event.screenX, event.screenY);
+        });
+
+        window.addEventListener('mouseup', () => {
+          if (!dragging) return;
+          dragging = false;
+          window.desktopClock.endWindowDrag();
         });
       }
 
@@ -257,18 +286,15 @@
       function hideToast() {
         const toast = document.getElementById('toast');
         toast.classList.remove('visible', 'persistent');
-        document.getElementById('toast-close').hidden = true;
         clearTimeout(toastTimer);
         scheduleFitWindow();
       }
 
       function showToast(message, type = 'info', persistent = false) {
         const toast = document.getElementById('toast');
-        const closeBtn = document.getElementById('toast-close');
         document.getElementById('toast-message').textContent = message;
         toast.dataset.type = type;
         toast.classList.toggle('persistent', persistent);
-        closeBtn.hidden = !persistent;
         toast.classList.add('visible');
         clearTimeout(toastTimer);
 
@@ -282,6 +308,7 @@
       async function init() {
         updateDate();
         setInterval(updateDate, 1000);
+        setupWindowDrag();
 
         document.getElementById('toast-close').addEventListener('click', hideToast);
 

@@ -5,6 +5,7 @@ const {
   Menu,
   Tray,
   nativeImage,
+  screen,
   shell,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
@@ -20,6 +21,7 @@ let updateDownloaded = false;
 let manualUpdateCheck = false;
 let countdownRunning = false;
 let countdownTimer = null;
+let dragOffset = null;
 
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -77,6 +79,11 @@ function createWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     notifyTimeFormat();
+  });
+
+  mainWindow.webContents.on('context-menu', (event) => {
+    event.preventDefault();
+    showWindowContextMenu();
   });
 
   mainWindow.once('ready-to-show', () => {
@@ -168,6 +175,14 @@ function getCountdownTotalSeconds({ hours, minutes, seconds }) {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
+function formatCountdownDuration({ hours, minutes, seconds }) {
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}小时`);
+  if (minutes > 0) parts.push(`${minutes}分钟`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}秒`);
+  return `${parts.join('')}计时结束！`;
+}
+
 function clearCountdownTimer() {
   if (countdownTimer) {
     clearTimeout(countdownTimer);
@@ -199,9 +214,12 @@ function onCountdownEnd() {
   }
 
   if (shouldRemind) {
+    const message = formatCountdownDuration(config.countdown);
     showMainWindow();
     mainWindow?.flashFrame(true);
-    showUpdateToast('倒计时结束！', 'success', true);
+    setTimeout(() => {
+      showUpdateToast(message, 'countdown-end', true);
+    }, 80);
   }
 
   rebuildTrayMenu();
@@ -238,8 +256,11 @@ function openCountdownDialog() {
   }
 
   countdownDialog = new BrowserWindow({
-    width: 340,
-    height: 280,
+    width: 400,
+    height: 320,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -267,9 +288,7 @@ function openCountdownDialog() {
   });
 }
 
-function rebuildTrayMenu() {
-  if (!tray) return;
-
+function buildAppMenuTemplate() {
   const template = [
     {
       label: '显示时钟',
@@ -317,11 +336,8 @@ function rebuildTrayMenu() {
 
   if (updateDownloaded) {
     template.push({
-      label: '立即重启并更新',
-      click: () => {
-        app.isQuitting = true;
-        autoUpdater.quitAndInstall();
-      },
+      label: '正在更新…',
+      enabled: false,
     });
   }
 
@@ -336,7 +352,17 @@ function rebuildTrayMenu() {
     },
   );
 
-  tray.setContextMenu(Menu.buildFromTemplate(template));
+  return template;
+}
+
+function showWindowContextMenu() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  Menu.buildFromTemplate(buildAppMenuTemplate()).popup({ window: mainWindow });
+}
+
+function rebuildTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(Menu.buildFromTemplate(buildAppMenuTemplate()));
 }
 
 function createTray() {
@@ -361,8 +387,8 @@ function registerAutoUpdaterEvents() {
 
   autoUpdater.on('update-downloaded', () => {
     updateDownloaded = true;
-    rebuildTrayMenu();
-    showUpdateToast('更新已下载，请从托盘选择「立即重启并更新」', 'success');
+    app.isQuitting = true;
+    autoUpdater.quitAndInstall(true, true);
   });
 
   autoUpdater.on('error', (error) => {
@@ -397,24 +423,34 @@ if (!gotLock) {
     const size = await mainWindow.webContents.executeJavaScript(`
       (() => {
         const appEl = document.getElementById('app');
-        const toast = document.getElementById('toast');
-        const appRect = appEl.getBoundingClientRect();
-        let width = appRect.width + 16;
-        let height = appRect.height + 16;
-
-        if (toast.classList.contains('visible')) {
-          const toastRect = toast.getBoundingClientRect();
-          width = Math.max(width, toastRect.width + 32);
-          height = Math.max(height, toastRect.bottom - appRect.top + 16);
-        }
-
+        const rect = appEl.getBoundingClientRect();
         return {
-          width: Math.ceil(width),
-          height: Math.ceil(height),
+          width: Math.ceil(rect.width + 16),
+          height: Math.ceil(rect.height + 16),
         };
       })()
     `);
     fitMainWindow(size.width, size.height);
+  });
+
+  ipcMain.on('window-drag-start', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const [x, y] = mainWindow.getPosition();
+    const cursor = screen.getCursorScreenPoint();
+    dragOffset = { x: cursor.x - x, y: cursor.y - y };
+  });
+
+  ipcMain.on('window-drag-move', (_event, { screenX, screenY }) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !dragOffset) return;
+    mainWindow.setPosition(
+      Math.round(screenX - dragOffset.x),
+      Math.round(screenY - dragOffset.y),
+    );
+  });
+
+  ipcMain.on('window-drag-end', () => {
+    dragOffset = null;
+    persistWindowBounds();
   });
 
   ipcMain.handle('get-countdown-defaults', () => config.countdown);
