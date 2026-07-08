@@ -14,23 +14,21 @@
 
       html,
       body {
-        width: 100%;
-        height: 100%;
+        width: fit-content;
+        height: fit-content;
         overflow: hidden;
         background: transparent;
-        -webkit-app-region: drag;
         user-select: none;
       }
 
       #app {
-        width: 100%;
-        height: 100%;
-        display: flex;
+        display: inline-flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        padding: 16px;
+        padding: 8px;
+        -webkit-app-region: drag;
       }
 
       #date {
@@ -40,6 +38,84 @@
         color: rgba(255, 255, 255, 0.88);
         letter-spacing: 0.04em;
         text-align: center;
+        -webkit-app-region: drag;
+      }
+
+      #countdown {
+        display: none;
+      }
+
+      #countdown.visible {
+        display: block;
+      }
+
+      #countdown .flipclock-theme {
+        font-size: 2rem !important;
+      }
+
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 8px;
+        transform: translateX(-50%) translateY(12px);
+        max-width: calc(100vw - 32px);
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        color: #fff;
+        background: rgba(30, 30, 30, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        -webkit-app-region: no-drag;
+        z-index: 100;
+        white-space: nowrap;
+      }
+
+      #toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+      }
+
+      #toast.persistent {
+        padding-right: 36px;
+      }
+
+      #toast-close {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        width: 20px;
+        height: 20px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        -webkit-app-region: no-drag;
+      }
+
+      #toast-close:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      #toast[data-type='success'] {
+        border-color: rgba(72, 187, 120, 0.6);
+      }
+
+      #toast[data-type='error'] {
+        border-color: rgba(245, 101, 101, 0.6);
+      }
+
+      #toast[data-type='info'] {
+        border-color: rgba(99, 179, 237, 0.6);
       }
     </style>
   </head>
@@ -47,11 +123,16 @@
     <div id="app">
       <div id="clock"></div>
       <div id="date"></div>
+      <div id="countdown"><div id="countdown-clock"></div></div>
+    </div>
+    <div id="toast" aria-live="polite">
+      <span id="toast-message"></span>
+      <button id="toast-close" hidden aria-label="关闭">×</button>
     </div>
 
     <script src="vendor/FlipClock.umd.js"></script>
     <script>
-      const { flipClock, clock, theme, css } = FlipClock;
+      const { flipClock, clock, elapsedTime, add, theme, css } = FlipClock;
 
       const WEEKDAYS = [
         '星期日',
@@ -62,6 +143,9 @@
         '星期五',
         '星期六',
       ];
+
+      let toastTimer = null;
+      let countdownInstance = null;
 
       function getTimeFormat(use24Hour) {
         return use24Hour ? '[HH]:[mm]:[ss]' : '[hh]:[mm]:[ss][A]';
@@ -77,6 +161,12 @@
 
       function updateDate() {
         document.getElementById('date').textContent = formatDate(new Date());
+      }
+
+      function scheduleFitWindow() {
+        requestAnimationFrame(() => {
+          window.desktopClock.fitWindow().catch(() => {});
+        });
       }
 
       function createClock(use24Hour) {
@@ -95,11 +185,105 @@
             }),
           }),
         });
+
+        scheduleFitWindow();
+      }
+
+      function destroyCountdownClock() {
+        if (countdownInstance) {
+          countdownInstance.stop();
+          countdownInstance.unmount();
+          countdownInstance = null;
+        }
+        document.getElementById('countdown-clock').innerHTML = '';
+      }
+
+      function hideCountdown() {
+        destroyCountdownClock();
+        document.getElementById('countdown').classList.remove('visible');
+        scheduleFitWindow();
+      }
+
+      function startCountdown({ hours, minutes, seconds }) {
+        destroyCountdownClock();
+
+        const endTime = add(new Date(), {
+          hours,
+          minutes,
+          seconds,
+        });
+
+        document.getElementById('countdown').classList.add('visible');
+
+        countdownInstance = flipClock({
+          parent: document.getElementById('countdown-clock'),
+          face: elapsedTime({
+            from: endTime,
+            to: new Date(),
+            format: '[hh]:[mm]:[ss]',
+          }),
+          theme: theme({
+            dividers: ':',
+            css: css({
+              fontSize: '2rem',
+            }),
+          }),
+        });
+
+        countdownInstance.start();
+        scheduleFitWindow();
+      }
+
+      function playReminderSound() {
+        try {
+          const ctx = new AudioContext();
+          const oscillator = ctx.createOscillator();
+          const gain = ctx.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.value = 880;
+          gain.gain.value = 0.08;
+          oscillator.connect(gain);
+          gain.connect(ctx.destination);
+          oscillator.start();
+          setTimeout(() => {
+            oscillator.stop();
+            ctx.close();
+          }, 280);
+        } catch {
+          // Ignore audio failures.
+        }
+      }
+
+      function hideToast() {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('visible', 'persistent');
+        document.getElementById('toast-close').hidden = true;
+        clearTimeout(toastTimer);
+        scheduleFitWindow();
+      }
+
+      function showToast(message, type = 'info', persistent = false) {
+        const toast = document.getElementById('toast');
+        const closeBtn = document.getElementById('toast-close');
+        document.getElementById('toast-message').textContent = message;
+        toast.dataset.type = type;
+        toast.classList.toggle('persistent', persistent);
+        closeBtn.hidden = !persistent;
+        toast.classList.add('visible');
+        clearTimeout(toastTimer);
+
+        if (!persistent) {
+          toastTimer = setTimeout(hideToast, 3000);
+        }
+
+        scheduleFitWindow();
       }
 
       async function init() {
         updateDate();
         setInterval(updateDate, 1000);
+
+        document.getElementById('toast-close').addEventListener('click', hideToast);
 
         const use24Hour = await window.desktopClock.getTimeFormat();
         createClock(use24Hour);
@@ -107,6 +291,23 @@
         window.desktopClock.onTimeFormatChange((nextUse24Hour) => {
           createClock(nextUse24Hour);
         });
+
+        window.desktopClock.onUpdateToast(({ message, type, persistent }) => {
+          showToast(message, type, persistent);
+        });
+
+        window.desktopClock.onCountdownStart((values) => {
+          startCountdown(values);
+        });
+
+        window.desktopClock.onCountdownStop(({ ended = false, remind = false } = {}) => {
+          hideCountdown();
+          if (ended && remind) {
+            playReminderSound();
+          }
+        });
+
+        scheduleFitWindow();
       }
 
       init();

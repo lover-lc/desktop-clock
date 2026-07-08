@@ -7,6 +7,12 @@ const DEFAULTS = {
   openAtLogin: false,
   use24Hour: true,
   windowBounds: { width: 820, height: 280, x: undefined, y: undefined },
+  countdown: {
+    hours: 0,
+    minutes: 5,
+    seconds: 0,
+    remind: false,
+  },
 };
 
 function getConfigPath() {
@@ -16,7 +22,12 @@ function getConfigPath() {
 function loadConfig() {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf8');
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      countdown: { ...DEFAULTS.countdown, ...parsed.countdown },
+    };
   } catch {
     return { ...DEFAULTS };
   }

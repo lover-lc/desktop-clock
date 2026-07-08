@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>设置倒计时</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: #1e1e1e;
+        color: #f0f0f0;
+        padding: 20px;
+      }
+
+      h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.8125rem;
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      input[type='number'] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        background: #2a2a2a;
+        color: #fff;
+        font-size: 1rem;
+      }
+
+      input[type='number']:focus {
+        outline: none;
+        border-color: rgba(99, 179, 237, 0.8);
+      }
+
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      button {
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: #e67e22;
+        color: #fff;
+      }
+
+      .btn-secondary {
+        background: #3a3a3a;
+        color: #fff;
+      }
+
+      .error {
+        color: #fc8181;
+        font-size: 0.8125rem;
+        margin-bottom: 12px;
+        min-height: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>设置倒计时</h2>
+    <div class="fields">
+      <label>
+        小时
+        <input id="hours" type="number" min="0" max="99" value="0" />
+      </label>
+      <label>
+        分钟
+        <input id="minutes" type="number" min="0" max="59" value="5" />
+      </label>
+      <label>
+        秒
+        <input id="seconds" type="number" min="0" max="59" value="0" />
+      </label>
+    </div>
+    <label class="checkbox">
+      <input id="remind" type="checkbox" />
+      结束时提醒
+    </label>
+    <div id="error" class="error"></div>
+    <div class="actions">
+      <button class="btn-secondary" id="cancel">取消</button>
+      <button class="btn-primary" id="start">开始</button>
+    </div>
+
+    <script>
+      async function init() {
+        const defaults = await window.countdownDialog.getDefaults();
+        document.getElementById('hours').value = defaults.hours;
+        document.getElementById('minutes').value = defaults.minutes;
+        document.getElementById('seconds').value = defaults.seconds;
+        document.getElementById('remind').checked = defaults.remind;
+      }
+
+      function readValues() {
+        return {
+          hours: Math.max(0, parseInt(document.getElementById('hours').value, 10) || 0),
+          minutes: Math.max(0, Math.min(59, parseInt(document.getElementById('minutes').value, 10) || 0)),
+          seconds: Math.max(0, Math.min(59, parseInt(document.getElementById('seconds').value, 10) || 0)),
+          remind: document.getElementById('remind').checked,
+        };
+      }
+
+      document.getElementById('cancel').addEventListener('click', () => {
+        window.countdownDialog.cancel();
+      });
+
+      document.getElementById('start').addEventListener('click', () => {
+        const values = readValues();
+        const total = values.hours * 3600 + values.minutes * 60 + values.seconds;
+        const errorEl = document.getElementById('error');
+        if (total <= 0) {
+          errorEl.textContent = '请设置大于 0 的倒计时';
+          return;
+        }
+        errorEl.textContent = '';
+        window.countdownDialog.submit(values);
+      });
+
+      init();
+    </script>
+  </body>
+</html>
