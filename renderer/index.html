@@ -26,32 +26,90 @@
         width: 100%;
         height: 100%;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         padding: 16px;
       }
 
+      #date {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.88);
+        letter-spacing: 0.04em;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <div id="clock"></div>
+      <div id="date"></div>
     </div>
 
     <script src="vendor/FlipClock.umd.js"></script>
     <script>
       const { flipClock, clock, theme, css } = FlipClock;
 
-      flipClock({
-        parent: document.querySelector('#clock'),
-        face: clock(),
-        theme: theme({
-          dividers: ':',
-          css: css({
-            fontSize: '3rem',
+      const WEEKDAYS = [
+        '星期日',
+        '星期一',
+        '星期二',
+        '星期三',
+        '星期四',
+        '星期五',
+        '星期六',
+      ];
+
+      function getTimeFormat(use24Hour) {
+        return use24Hour ? '[HH]:[mm]:[ss]' : '[hh]:[mm]:[ss][A]';
+      }
+
+      function formatDate(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const weekday = WEEKDAYS[date.getDay()];
+        return `${year}年${month}月${day}日 ${weekday}`;
+      }
+
+      function updateDate() {
+        document.getElementById('date').textContent = formatDate(new Date());
+      }
+
+      function createClock(use24Hour) {
+        const parent = document.querySelector('#clock');
+        parent.innerHTML = '';
+
+        flipClock({
+          parent,
+          face: clock({
+            format: getTimeFormat(use24Hour),
           }),
-        }),
-      });
+          theme: theme({
+            dividers: ':',
+            css: css({
+              fontSize: '3rem',
+            }),
+          }),
+        });
+      }
+
+      async function init() {
+        updateDate();
+        setInterval(updateDate, 1000);
+
+        const use24Hour = await window.desktopClock.getTimeFormat();
+        createClock(use24Hour);
+
+        window.desktopClock.onTimeFormatChange((nextUse24Hour) => {
+          createClock(nextUse24Hour);
+        });
+      }
+
+      init();
     </script>
   </body>
 </html>

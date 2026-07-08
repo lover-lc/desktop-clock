@@ -1,6 +1,7 @@
 const {
   app,
   BrowserWindow,
+  ipcMain,
   Menu,
   Tray,
   nativeImage,
@@ -47,6 +48,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    notifyTimeFormat();
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -98,6 +103,18 @@ function setOpenAtLogin(enabled) {
   rebuildTrayMenu();
 }
 
+function notifyTimeFormat() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('time-format-changed', config.use24Hour);
+}
+
+function setUse24Hour(enabled) {
+  config.use24Hour = enabled;
+  saveConfig(config);
+  notifyTimeFormat();
+  rebuildTrayMenu();
+}
+
 function showMainWindow() {
   if (!mainWindow) return;
   if (!mainWindow.isVisible()) {
@@ -126,6 +143,12 @@ function rebuildTrayMenu() {
       type: 'checkbox',
       checked: config.openAtLogin,
       click: (item) => setOpenAtLogin(item.checked),
+    },
+    {
+      label: '24 小时制',
+      type: 'checkbox',
+      checked: config.use24Hour,
+      click: (item) => setUse24Hour(item.checked),
     },
     { type: 'separator' },
     {
@@ -217,6 +240,8 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', showMainWindow);
+
+  ipcMain.handle('get-time-format', () => config.use24Hour);
 
   app.whenReady().then(() => {
     applyLoginItemSettings();

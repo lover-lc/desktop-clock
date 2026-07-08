@@ -5,7 +5,8 @@ const { app } = require('electron');
 const DEFAULTS = {
   alwaysOnTop: false,
   openAtLogin: false,
-  windowBounds: { width: 820, height: 220, x: undefined, y: undefined },
+  use24Hour: true,
+  windowBounds: { width: 820, height: 280, x: undefined, y: undefined },
 };
 
 function getConfigPath() {
