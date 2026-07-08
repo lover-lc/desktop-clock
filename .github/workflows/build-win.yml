@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+env:
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
 jobs:
   build:
     runs-on: windows-latest
@@ -16,6 +20,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/electron
+            .cache/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,6 +51,7 @@ jobs:
         run: npm run build
 
       - name: Upload artifacts
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: desktop-clock-windows
